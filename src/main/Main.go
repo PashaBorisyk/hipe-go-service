@@ -1,14 +1,20 @@
 package main
 
 import (
-	"point"
-	"log"
+	"net/http"
+	"golang.org/x/net/websocket"
 )
 
 func main()  {
 
-	mPoint := point.NewPoint(1,2,23)
-	println(mPoint.X)
-	log.Print()
+	println("Point service starting...")
+
+	http.Handle("/",websocket.Handler(WebSocketHandler))
+
+
+}
+
+
+func WebSocketHandler(ws *websocket.Conn){
 
 }
