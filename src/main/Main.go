@@ -1,20 +1,31 @@
 package main
 
 import (
-	"net/http"
-	"golang.org/x/net/websocket"
+	"log"
+	"room"
 )
 
-func main()  {
+const (
+	ThisAddr      = ":8081"
+	PayloadLength = 1024
+	ServerAddr    = "ws://localhost:9090/ws/"
+)
 
-	println("Point service starting...")
+func main() {
 
-	http.Handle("/",websocket.Handler(WebSocketHandler))
-
+	log.Print("Point service starting...")
+	configureServerConnections()
+	log.Print("Program finished")
 
 }
 
+func configureServerConnections() {
 
-func WebSocketHandler(ws *websocket.Conn){
+	connectionsRoom := room.NewRoom(ThisAddr, ServerAddr, PayloadLength, PayloadLength, 10)
+	err := connectionsRoom.InitServerConnection()
+	if err != nil {
+		log.Println("Application will run in test mode!")
+	}
+	connectionsRoom.InitClientConnections()
 
 }
