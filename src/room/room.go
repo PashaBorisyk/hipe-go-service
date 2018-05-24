@@ -1,8 +1,10 @@
 package room
 
 import (
+	"encoding/json"
 	"golang.org/x/net/websocket"
 	"log"
+	"model"
 	"net/http"
 )
 
@@ -82,22 +84,16 @@ func (room *Room) serveServerConnection() {
 
 func (room *Room) serveClientConnection(ws *websocket.Conn) {
 
-	log.Print("Connection created with addres " + ws.Request().RemoteAddr)
-
+	log.Print("Connection " + ws.Request().RemoteAddr + " created")
 	ws.MaxPayloadBytes = room.clientBuffSize
-	ws.Write([]byte("Handshake"))
-	for {
-		msg := make([]byte, room.clientBuffSize)
-		read, err := ws.Read(msg)
-		if err != nil {
-			log.Println("Closing client connection with addres " + ws.Request().RemoteAddr)
-			log.Println(err)
-			ws.Close()
-			return
+
+	for i := 0; i < 10; i++ {
+		raw, err := json.Marshal(model.NewModel())
+		if err == nil {
+			ws.Write(raw)
 		}
-
-		log.Print(string(msg[0:read]) + " received")
-
 	}
+
+	log.Println("Connection " + ws.Request().RemoteAddr + " closed")
 
 }
