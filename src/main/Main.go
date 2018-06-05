@@ -3,25 +3,28 @@ package main
 import (
 	"log"
 	"room"
+	"sync"
 )
 
-const (
-	ThisAddr      = ":8081"
-	PayloadLength = 1024
-	ServerAddr    = "ws://localhost:9090/ws/"
-)
+var wg = new(sync.WaitGroup)
 
 func main() {
 
-	log.Print("Point service starting...")
-	configureServerConnections()
+	log.Print("Starting application...")
+
+	wg.Add(1)
+	go configureServerConnections()
+
+	log.Println("Application started")
+	wg.Wait()
 	log.Print("Program finished")
 
 }
 
 func configureServerConnections() {
 
-	connectionsRoom := room.NewRoom(ThisAddr, ServerAddr, PayloadLength, PayloadLength, 10)
+	defer wg.Done()
+	connectionsRoom := room.NewRoomFromConfig(wg)
 	err := connectionsRoom.InitServerConnection()
 	if err != nil {
 		log.Println("Application will run in test mode!")

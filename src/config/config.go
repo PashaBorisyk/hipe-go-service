@@ -6,6 +6,8 @@ import (
 	"log"
 )
 
+var globalConfig *GlobalConfig
+
 func init() {
 
 	log.Println("Creating configuration...")
@@ -36,6 +38,7 @@ func init() {
 	} else {
 		log.Println("Decoding successfull")
 		log.Println(config)
+		globalConfig = &config
 	}
 
 }
@@ -59,9 +62,13 @@ type Server struct {
 }
 
 type Client struct {
-	ListenPort            int  `json:"listen_port"`
-	ConnectionPullSize    int  `json:"connection_pull_size"`
-	MaxConnectionPoolSize int  `json:"max_connection_pool_size"`
-	MinConnectionPoolSize int  `json:"min_connection_pool_size"`
-	AutoConfigPoolSize    bool `json:"auto_config_pool_size"`
+	ListenPort            string `json:"listen_port"`
+	ConnectionPullSize    int    `json:"connection_pull_size"`
+	MaxConnectionPoolSize int    `json:"max_connection_pool_size"`
+	MinConnectionPoolSize int    `json:"min_connection_pool_size"`
+	AutoConfigPoolSize    bool   `json:"auto_config_pool_size"`
+}
+
+func GetConfig() GlobalConfig {
+	return *globalConfig
 }

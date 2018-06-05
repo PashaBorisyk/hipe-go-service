@@ -1,11 +1,13 @@
 package room
 
 import (
+	"config"
 	"encoding/json"
 	"golang.org/x/net/websocket"
 	"log"
 	"model"
 	"net/http"
+	"sync"
 )
 
 type RoomChannel chan Point
@@ -16,24 +18,41 @@ type Point struct {
 }
 
 type Room struct {
-	thisAddr          string
+	thisPort          string
 	serverAddr        string
 	clientBuffSize    int
 	serverBuffSize    int
 	roomChanel        RoomChannel
 	serverConnection  *websocket.Conn
-	clientConnections map[uint]*websocket.Conn
+	clientConnections map[int]*websocket.Conn
+	waitGroup         *sync.WaitGroup
 }
 
-func NewRoom(thisAddr, serverAddr string, clientBufSize, serverBufSize int, maxClientSize uint) *Room {
+func NewRoom(thisAddr, serverAddr string, clientBufSize, serverBufSize int, maxClientSize int, waitGroup *sync.WaitGroup) *Room {
 
 	return &Room{
-		thisAddr:          thisAddr,
+		thisPort:          thisAddr,
 		serverAddr:        serverAddr,
 		clientBuffSize:    clientBufSize,
 		serverBuffSize:    serverBufSize,
 		roomChanel:        make(chan Point, maxClientSize),
-		clientConnections: make(map[uint]*websocket.Conn),
+		clientConnections: make(map[int]*websocket.Conn),
+		serverConnection:  nil,
+		waitGroup:         waitGroup,
+	}
+
+}
+
+func NewRoomFromConfig(waitGroup *sync.WaitGroup) *Room {
+
+	var globalConfig = config.GetConfig()
+
+	return &Room{
+		thisPort:          globalConfig.ConnectionsConfig.Client.ListenPort,
+		serverAddr:        globalConfig.ConnectionsConfig.Server.Url,
+		clientBuffSize:    globalConfig.ConnectionsConfig.Client.MaxConnectionPoolSize,
+		roomChanel:        make(chan Point, globalConfig.ConnectionsConfig.Client.MaxConnectionPoolSize),
+		clientConnections: make(map[int]*websocket.Conn),
 		serverConnection:  nil,
 	}
 
@@ -41,12 +60,8 @@ func NewRoom(thisAddr, serverAddr string, clientBufSize, serverBufSize int, maxC
 
 func (room *Room) InitClientConnections() {
 	log.Println("Initing client connection pull...")
+	room.waitGroup.Add(1)
 	http.Handle("/", websocket.Handler(room.serveClientConnection))
-	err := http.ListenAndServe(room.thisAddr, websocket.Handler(room.serveClientConnection))
-	if err != nil {
-		log.Print("Error while listening to connections")
-		log.Fatal(err)
-	}
 }
 
 func (room *Room) InitServerConnection() error {
@@ -58,6 +73,7 @@ func (room *Room) InitServerConnection() error {
 		return err
 	}
 	room.serverConnection = conn
+	room.waitGroup.Add(1)
 	go room.serveServerConnection()
 	log.Println("Connection created successfully")
 	return nil
@@ -66,9 +82,9 @@ func (room *Room) InitServerConnection() error {
 func (room *Room) serveServerConnection() {
 	log.Print("Connection created with addres " + room.serverConnection.Request().RemoteAddr)
 
+	defer room.waitGroup.Done()
+
 	room.serverConnection.MaxPayloadBytes = room.serverBuffSize
-	room.serverConnection.Write([]byte("Handshake"))
-	defer room.InitServerConnection()
 	for {
 		msg := make([]byte, room.clientBuffSize)
 		_, err := room.serverConnection.Read(msg)
@@ -80,6 +96,7 @@ func (room *Room) serveServerConnection() {
 		}
 
 	}
+
 }
 
 func (room *Room) serveClientConnection(ws *websocket.Conn) {
@@ -87,11 +104,19 @@ func (room *Room) serveClientConnection(ws *websocket.Conn) {
 	log.Print("Connection " + ws.Request().RemoteAddr + " created")
 	ws.MaxPayloadBytes = room.clientBuffSize
 
-	for i := 0; i < 10; i++ {
+	defer room.waitGroup.Done()
+
+	for {
 		raw, err := json.Marshal(model.NewModel())
 		if err == nil {
 			ws.Write(raw)
 		}
+		read, err := ws.Read(raw)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println(read)
 	}
 
 	log.Println("Connection " + ws.Request().RemoteAddr + " closed")
