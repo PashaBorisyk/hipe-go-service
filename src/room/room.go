@@ -26,6 +26,7 @@ type Room struct {
 	serverConnection  *websocket.Conn
 	clientConnections map[int]*websocket.Conn
 	waitGroup         *sync.WaitGroup
+	serverError       error
 }
 
 func NewRoom(thisAddr, serverAddr string, clientBufSize, serverBufSize int, maxClientSize int, waitGroup *sync.WaitGroup) *Room {
@@ -50,17 +51,19 @@ func NewRoomFromConfig(waitGroup *sync.WaitGroup) *Room {
 	return &Room{
 		thisPort:          globalConfig.ConnectionsConfig.Client.ListenPort,
 		serverAddr:        globalConfig.ConnectionsConfig.Server.Url,
-		clientBuffSize:    globalConfig.ConnectionsConfig.Client.MaxConnectionPoolSize,
+		clientBuffSize:    globalConfig.ConnectionsConfig.Client.MaxBuffSize,
 		roomChanel:        make(chan Point, globalConfig.ConnectionsConfig.Client.MaxConnectionPoolSize),
 		clientConnections: make(map[int]*websocket.Conn),
 		serverConnection:  nil,
+		waitGroup:         waitGroup,
 	}
 
 }
 
 func (room *Room) InitClientConnections() {
-	log.Println("Initing client connection pull...")
+	log.Println("Waiting for incommeng client connections")
 	room.waitGroup.Add(1)
+	defer room.waitGroup.Done()
 	http.Handle("/", websocket.Handler(room.serveClientConnection))
 }
 
@@ -75,21 +78,22 @@ func (room *Room) InitServerConnection() error {
 	room.serverConnection = conn
 	room.waitGroup.Add(1)
 	go room.serveServerConnection()
-	log.Println("Connection created successfully")
+	log.Println("Server connection" + room.serverAddr + " created successfully")
 	return nil
 }
 
 func (room *Room) serveServerConnection() {
-	log.Print("Connection created with addres " + room.serverConnection.Request().RemoteAddr)
-
 	defer room.waitGroup.Done()
+
+	addr := room.serverConnection.RemoteAddr().String()
 
 	room.serverConnection.MaxPayloadBytes = room.serverBuffSize
 	for {
 		msg := make([]byte, room.clientBuffSize)
-		_, err := room.serverConnection.Read(msg)
+		read, err := room.serverConnection.Read(msg)
+		log.Println(string(msg[0:read]))
 		if err != nil {
-			log.Println("Closing server connection with addres " + room.serverConnection.Request().RemoteAddr)
+			log.Println("Closing server connection with addres " + addr)
 			log.Println(err)
 			room.serverConnection.Close()
 			return
@@ -97,11 +101,15 @@ func (room *Room) serveServerConnection() {
 
 	}
 
+	log.Println("Server connection" + addr + "closed")
+
 }
 
 func (room *Room) serveClientConnection(ws *websocket.Conn) {
 
-	log.Print("Connection " + ws.Request().RemoteAddr + " created")
+	addr := ws.RemoteAddr().String()
+
+	log.Print("Client connection " + addr + " created")
 	ws.MaxPayloadBytes = room.clientBuffSize
 
 	defer room.waitGroup.Done()
@@ -119,6 +127,6 @@ func (room *Room) serveClientConnection(ws *websocket.Conn) {
 		log.Println(read)
 	}
 
-	log.Println("Connection " + ws.Request().RemoteAddr + " closed")
+	log.Println("Client connection " + addr + " closed")
 
 }

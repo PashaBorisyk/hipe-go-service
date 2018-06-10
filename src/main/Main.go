@@ -6,14 +6,13 @@ import (
 	"sync"
 )
 
-var wg = new(sync.WaitGroup)
-
 func main() {
 
+	var wg sync.WaitGroup
 	log.Print("Starting application...")
 
 	wg.Add(1)
-	go configureServerConnections()
+	go configureServerConnections(&wg)
 
 	log.Println("Application started")
 	wg.Wait()
@@ -21,10 +20,10 @@ func main() {
 
 }
 
-func configureServerConnections() {
+func configureServerConnections(group *sync.WaitGroup) {
 
-	defer wg.Done()
-	connectionsRoom := room.NewRoomFromConfig(wg)
+	defer group.Done()
+	connectionsRoom := room.NewRoomFromConfig(group)
 	err := connectionsRoom.InitServerConnection()
 	if err != nil {
 		log.Println("Application will run in test mode!")

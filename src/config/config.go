@@ -66,6 +66,7 @@ type Client struct {
 	ConnectionPullSize    int    `json:"connection_pull_size"`
 	MaxConnectionPoolSize int    `json:"max_connection_pool_size"`
 	MinConnectionPoolSize int    `json:"min_connection_pool_size"`
+	MaxBuffSize           int    `json:"max_buff_size"`
 	AutoConfigPoolSize    bool   `json:"auto_config_pool_size"`
 }
 
