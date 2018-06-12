@@ -24,10 +24,15 @@ func configureServerConnections(group *sync.WaitGroup) {
 
 	defer group.Done()
 	connectionsRoom := room.NewRoomFromConfig(group)
-	err := connectionsRoom.InitServerConnection()
-	if err != nil {
-		log.Println("Application will run in test mode!")
+	repairCode := make(chan bool)
+	group.Add(1)
+	go connectionsRoom.InitServerConnection(&repairCode)
+	group.Add(1)
+	go connectionsRoom.InitClientConnections()
+
+	for <-repairCode {
+		group.Add(1)
+		go connectionsRoom.InitServerConnection(&repairCode)
 	}
-	connectionsRoom.InitClientConnections()
 
 }
